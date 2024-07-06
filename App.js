@@ -1,26 +1,40 @@
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Text, TextInput, View, Button, FlatList, TouchableOpacity } from "react-native";
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { db } from './firebase';
 import styles from './styles';
 
 export default function App() {
   const [titleOfTask, setTaskTitle] = useState('');
   const [tasks, setTasks] = useState([]);
 
-  const addTask = () => {
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const querySnapshot = await getDocs(collection(db, "tasks"));
+      const tasksData = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+      setTasks(tasksData);
+    };
+    fetchTasks();
+  }, []);
+
+  const addTask = async () => {
     if (titleOfTask.trim() !== "") {
-      setTasks([...tasks, { title: titleOfTask, status: false }]);
+      const docRef = await addDoc(collection(db, "tasks"), { title: titleOfTask, status: false });
+      setTasks([...tasks, { title: titleOfTask, status: false, id: docRef.id }]);
       setTaskTitle("");
     }
   };
-  
-  const changeTaskStatus = (index) => {
+
+  const changeTaskStatus = async (index) => {
     const newTasks = tasks.slice();
     newTasks[index].status = !newTasks[index].status;
+    await updateDoc(doc(db, "tasks", newTasks[index].id), { status: newTasks[index].status });
     setTasks(newTasks);
   };
 
-  const deleteTask = (index) => {
+  const deleteTask = async (index) => {
+    await deleteDoc(doc(db, "tasks", tasks[index].id));
     const newTasks = tasks.slice(0, index).concat(tasks.slice(index + 1));
     setTasks(newTasks);
   };  
@@ -50,7 +64,7 @@ export default function App() {
             </View>
           </View>
         )}
-        keyExtractor={(item, index) => index.toString()}
+        keyExtractor={(item) => item.id}
       />
       <StatusBar style="auto" />
     </View>
